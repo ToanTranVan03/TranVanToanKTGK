@@ -61,6 +61,10 @@ builder.Services.AddRateLimiter(options =>
 
 builder.Services.AddHealthChecks();
 
+// Swagger - tài liệu API
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
 var app = builder.Build();
 
 if (app.Configuration.GetValue<bool>("Database:ApplyMigrationsOnStartup"))
@@ -79,6 +83,23 @@ if (app.Configuration.GetValue<bool>("Database:ApplyMigrationsOnStartup"))
 using (var scope = app.Services.CreateScope())
 {
     await AuthSetup.SeedAuthRolesAsync(scope.ServiceProvider, app.Configuration);
+}
+
+if (app.Environment.IsDevelopment() ||
+    app.Configuration.GetValue<bool>("Swagger:Enabled"))
+{
+    app.UseSwagger();
+
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint(
+            "/swagger/v1/swagger.json",
+            "TranVanToanKTGK API v1"
+        );
+
+        options.DocumentTitle =
+            "TranVanToanKTGK - Swagger API";
+    });
 }
 
 app.UseRouting();

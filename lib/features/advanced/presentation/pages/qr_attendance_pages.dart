@@ -197,10 +197,20 @@ class _QrGpsScanPageState extends ConsumerState<QrGpsScanPage> {
           'Chưa cấp quyền vị trí. Hãy bật quyền Location trong Settings.',
         );
       }
-      final position = await Geolocator.getCurrentPosition(
+      Position? position;
+      try {
+        position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: Duration(seconds: 8),
+          ),
+        );
+      } catch (_) {
+        position = await Geolocator.getLastKnownPosition();
+      }
+      position ??= await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 20),
+          accuracy: LocationAccuracy.medium,
         ),
       );
       if (!mounted) return;
@@ -226,7 +236,7 @@ class _QrGpsScanPageState extends ConsumerState<QrGpsScanPage> {
             children: [
               Icon(Icons.location_off, color: Colors.amber),
               SizedBox(width: 8),
-              Text('Không thể điểm danh'),
+              Expanded(child: Text('Không thể điểm danh')),
             ],
           ),
           content: Text(msg.toString()),

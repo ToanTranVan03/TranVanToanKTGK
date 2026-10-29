@@ -112,6 +112,35 @@ class _CatalogPageState extends ConsumerState<CatalogPage> {
   AcademicApi get api => AcademicApi(ref.read(apiClientProvider));
   bool get courses => widget.type == 'courses';
 
+  double parseCoordinate(String text) {
+    final cleaned = text.trim().toUpperCase();
+    final direct = double.tryParse(cleaned);
+    if (direct != null) return direct;
+
+    try {
+      final numbers = RegExp(r'-?[\d.]+')
+          .allMatches(cleaned)
+          .map((m) => double.tryParse(m.group(0) ?? '') ?? 0.0)
+          .toList();
+
+      if (numbers.isNotEmpty) {
+        double val = numbers[0];
+        if (numbers.length > 1) {
+          val += numbers[1] / 60.0;
+        }
+        if (numbers.length > 2) {
+          val += numbers[2] / 3600.0;
+        }
+        if (cleaned.contains('S') || cleaned.contains('W')) {
+          val = -val.abs();
+        }
+        return val;
+      }
+    } catch (_) {}
+
+    return 0.0;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -148,6 +177,21 @@ class _CatalogPageState extends ConsumerState<CatalogPage> {
           ? '100'
           : _value(row?['radiusMeters']),
     );
+
+    if (row == null && !courses) {
+      lat.text = '10.762622'; // Default Vietnam HCMC
+      lon.text = '106.660172';
+      Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 5),
+        ),
+      ).then((pos) {
+        lat.text = pos.latitude.toStringAsFixed(6);
+        lon.text = pos.longitude.toStringAsFixed(6);
+      }).catchError((_) {});
+    }
+
     final payload = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -173,7 +217,7 @@ class _CatalogPageState extends ConsumerState<CatalogPage> {
                   const SizedBox(height: 8),
                   FilledButton.icon(
                     icon: const Icon(Icons.my_location),
-                    label: const Text('📍 Lấy vị trí GPS hiện tại'),
+                    label: const Text('📍 Lấy GPS máy (Điện thoại/Emulator)'),
                     onPressed: () async {
                       try {
                         if (!await Geolocator.isLocationServiceEnabled()) {
@@ -195,10 +239,20 @@ class _CatalogPageState extends ConsumerState<CatalogPage> {
                           return;
                         }
 
-                        final position = await Geolocator.getCurrentPosition(
+                        Position? position;
+                        try {
+                          position = await Geolocator.getCurrentPosition(
+                            locationSettings: const LocationSettings(
+                              accuracy: LocationAccuracy.high,
+                              timeLimit: Duration(seconds: 8),
+                            ),
+                          );
+                        } catch (_) {
+                          position = await Geolocator.getLastKnownPosition();
+                        }
+                        position ??= await Geolocator.getCurrentPosition(
                           locationSettings: const LocationSettings(
-                            accuracy: LocationAccuracy.high,
-                            timeLimit: Duration(seconds: 20),
+                            accuracy: LocationAccuracy.medium,
                           ),
                         );
 
@@ -210,7 +264,7 @@ class _CatalogPageState extends ConsumerState<CatalogPage> {
                         ScaffoldMessenger.of(ctx).showSnackBar(
                           SnackBar(
                             content: Text(
-                              'Đã lấy tọa độ GPS: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)} (Sai số ~${position.accuracy.toStringAsFixed(0)}m).',
+                              'Đã điền tọa độ GPS: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}. Đừng quên bấm LƯU!',
                             ),
                           ),
                         );
@@ -222,6 +276,34 @@ class _CatalogPageState extends ConsumerState<CatalogPage> {
                         );
                       }
                     },
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      OutlinedButton(
+                        onPressed: () {
+                          lat.text = '10.762622';
+                          lon.text = '106.660172';
+                        },
+                        child: const Text('📍 Mẫu TP.HCM'),
+                      ),
+                      OutlinedButton(
+                        onPressed: () {
+                          lat.text = '21.028511';
+                          lon.text = '105.804817';
+                        },
+                        child: const Text('📍 Mẫu Hà Nội'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    '💡 Mẹo: Máy ảo Android mặc định định vị ở Mỹ (37.422, -122.084). Bạn có thể tự gõ vĩ độ/kinh độ của bạn hoặc bấm mẫu TP.HCM/Hà Nội, sau đó nhấn "LƯU".',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 11, color: Colors.grey),
                   ),
                 ],
               ],
@@ -235,6 +317,10 @@ class _CatalogPageState extends ConsumerState<CatalogPage> {
           ),
           FilledButton(
             onPressed: () {
+              final latitude = parseCoordinate(lat.text);
+              final longitude = parseCoordinate(lon.text);
+              final radiusVal = double.tryParse(radius.text) ?? 100;
+
               final body = courses
                   ? <String, dynamic>{
                       'code': code.text.trim(),
@@ -243,9 +329,9 @@ class _CatalogPageState extends ConsumerState<CatalogPage> {
                     }
                   : <String, dynamic>{
                       'name': name.text.trim(),
-                      'latitude': double.tryParse(lat.text) ?? 0,
-                      'longitude': double.tryParse(lon.text) ?? 0,
-                      'radiusMeters': double.tryParse(radius.text) ?? 0,
+                      'latitude': latitude,
+                      'longitude': longitude,
+                      'radiusMeters': radiusVal,
                     };
               Navigator.pop(ctx, body);
             },
