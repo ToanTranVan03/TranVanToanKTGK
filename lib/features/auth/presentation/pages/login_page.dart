@@ -1,153 +1,98 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../app/theme/app_theme.dart';
+import '../../../../core/config/api_config.dart';
+import '../../../../core/network/api_client.dart';
+import '../../data/auth_api.dart';
+import 'otp_page.dart';
 
-/// Chi la UI va validate input o Phan 1. CHUA xac thuc tai khoan that.
-class LoginPage extends StatefulWidget {
+class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
-
   @override
-  State<LoginPage> createState() => _LoginPageState();
+  ConsumerState<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
+class _LoginPageState extends ConsumerState<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController();
-  final _passwordController = TextEditingController();
-  bool _obscurePassword = true;
+  final _username = TextEditingController();
+  final _password = TextEditingController();
+  bool _hidden = true;
+  bool _busy = false;
 
   @override
   void dispose() {
-    _usernameController.dispose();
-    _passwordController.dispose();
+    _username.dispose();
+    _password.dispose();
     super.dispose();
   }
 
-  void _validateForm() {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Biểu mẫu hợp lệ. Đăng nhập API và OTP sẽ làm ở Phần 3.'),
-      ),
-    );
+  Future<void> _login() async {
+    if (!(_formKey.currentState?.validate() ?? false) || _busy) return;
+    if (!ApiConfig.isConfigured) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Chưa cấu hình API HTTPS. Xem README-PHAN-3.md.'),
+      ));
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      final api = AuthApi(ref.read(apiClientProvider));
+      final result = await api.passwordLogin(_username.text.trim(), _password.text);
+      if (!mounted) return;
+      context.push('/otp', extra: OtpArguments.login(
+        ticket: result['ticket'] as String,
+        emailHint: result['emailHint'] as String? ?? '',
+      ));
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorText(error))));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Đăng nhập'),
-        leading: IconButton(
-          tooltip: 'Quay lại',
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/'),
-        ),
-      ),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 440),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 90,
-                        height: 90,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE5ECFF),
-                          borderRadius: BorderRadius.circular(26),
-                        ),
-                        child: const Icon(
-                          Icons.person_outline_rounded,
-                          size: 48,
-                          color: AppTheme.primary,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-                    const Text(
-                      'Chào mừng trở lại!',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 25,
-                        fontWeight: FontWeight.w800,
-                        color: AppTheme.darkText,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Nhập thông tin tài khoản để tiếp tục',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Color(0xFF69768F)),
-                    ),
-                    const SizedBox(height: 36),
-                    TextFormField(
-                      controller: _usernameController,
-                      textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(
-                        labelText: 'Tên đăng nhập',
-                        prefixIcon: Icon(Icons.person_outline),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Vui lòng nhập tên đăng nhập';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 18),
-                    TextFormField(
-                      controller: _passwordController,
-                      obscureText: _obscurePassword,
-                      onFieldSubmitted: (_) => _validateForm(),
-                      decoration: InputDecoration(
-                        labelText: 'Mật khẩu',
-                        prefixIcon: const Icon(Icons.lock_outline),
-                        suffixIcon: IconButton(
-                          tooltip: _obscurePassword
-                              ? 'Hiện mật khẩu'
-                              : 'Ẩn mật khẩu',
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_off_outlined
-                                : Icons.visibility_outlined,
-                          ),
-                          onPressed: () => setState(
-                            () => _obscurePassword = !_obscurePassword,
-                          ),
-                        ),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Vui lòng nhập mật khẩu';
-                        }
-                        return null;
-                      },
-                    ),
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('Đăng nhập')),
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Form(
+                  key: _formKey,
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    const Icon(Icons.verified_user_outlined, size: 74, color: Color(0xFF275DCE)),
+                    const SizedBox(height: 16),
+                    const Text('Chào mừng trở lại!', textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 28),
+                    TextFormField(controller: _username, textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(labelText: 'Tên đăng nhập', prefixIcon: Icon(Icons.person_outline)),
+                      validator: (v) => v == null || v.trim().isEmpty ? 'Vui lòng nhập tên đăng nhập' : null),
+                    const SizedBox(height: 16),
+                    TextFormField(controller: _password, obscureText: _hidden,
+                      decoration: InputDecoration(labelText: 'Mật khẩu', prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(onPressed: () => setState(() => _hidden = !_hidden),
+                          icon: Icon(_hidden ? Icons.visibility_off_outlined : Icons.visibility_outlined))),
+                      validator: (v) => v == null || v.isEmpty ? 'Vui lòng nhập mật khẩu' : null,
+                      onFieldSubmitted: (_) => _login()),
                     const SizedBox(height: 24),
-                    FilledButton(
-                      onPressed: _validateForm,
-                      child: const Text('Kiểm tra biểu mẫu'),
-                    ),
-                    const SizedBox(height: 18),
-                    const Text(
-                      'Giao diện thử nghiệm: thông tin chưa được gửi đến máy chủ.',
+                    FilledButton(onPressed: _busy ? null : _login,
+                      child: Text(_busy ? 'Đang gửi OTP...' : 'Đăng nhập')),
+                    const SizedBox(height: 8),
+                    TextButton(onPressed: () => context.push('/register'),
+                      child: const Text('Chưa có tài khoản? Đăng ký')),
+                    const SizedBox(height: 6),
+                    const Text('Sau khi nhập đúng mật khẩu, mã OTP sẽ được gửi qua email.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Color(0xFF69768F), fontSize: 12),
-                    ),
-                  ],
+                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                  ]),
                 ),
               ),
             ),
           ),
         ),
-      ),
-    );
-  }
+      );
 }

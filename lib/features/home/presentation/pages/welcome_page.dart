@@ -93,7 +93,7 @@ class WelcomePage extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'TranVanToanKTGK  •  Giai đoạn 2',
+                  'TranVanToanKTGK  •  Giai đoạn 3',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Color(0xFF8090A7),

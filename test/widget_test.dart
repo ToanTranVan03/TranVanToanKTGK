@@ -41,7 +41,7 @@ void main() {
     await tester.tap(startButton);
     await tester.pumpAndSettle();
 
-    final submit = find.text('Kiểm tra biểu mẫu');
+    final submit = find.widgetWithText(FilledButton, 'Đăng nhập');
     await tester.scrollUntilVisible(
       submit,
       200,

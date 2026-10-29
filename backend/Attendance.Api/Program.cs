@@ -1,4 +1,7 @@
+using Attendance.Api.Auth;
 using Attendance.Api.Data;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 using Attendance.Api.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -26,10 +29,27 @@ builder.Services.AddIdentityCore<ApplicationUser>(options =>
     {
         options.User.RequireUniqueEmail = true;
         options.Password.RequiredLength = 10;
+        options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+        options.Lockout.AllowedForNewUsers = true;
         options.Lockout.MaxFailedAccessAttempts = 5;
     })
     .AddRoles<IdentityRole<Guid>>()
-    .AddEntityFrameworkStores<AttendanceDbContext>();
+    .AddEntityFrameworkStores<AttendanceDbContext>()
+    .AddDefaultTokenProviders();
+
+builder.Services.AddAttendanceAuthentication(builder.Configuration);
+builder.Services.AddAuthorizationBuilder().AddPolicy("ADMIN", p => p.RequireRole("ADMIN"));
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddFixedWindowLimiter("auth", limiter =>
+    {
+        limiter.PermitLimit = 12;
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.QueueLimit = 0;
+        limiter.AutoReplenishment = true;
+    });
+});
 
 builder.Services.AddHealthChecks();
 
@@ -48,6 +68,16 @@ if (app.Configuration.GetValue<bool>("Database:ApplyMigrationsOnStartup"))
     await db.Database.MigrateAsync();
 }
 
+using (var scope = app.Services.CreateScope())
+{
+    await AuthSetup.SeedAuthRolesAsync(scope.ServiceProvider, app.Configuration);
+}
+
+app.UseRouting();
+app.UseRateLimiter();
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapAttendanceAuth();
 app.MapHealthChecks("/health");
 
 app.MapGet("/api/v1/system/status", async (
