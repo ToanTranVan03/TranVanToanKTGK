@@ -118,7 +118,9 @@ public sealed class JwtTokenService(IConfiguration configuration)
                 username = user.UserName,
                 email = user.Email,
                 fullName = user.FullName,
-                role = roleNames.FirstOrDefault() ?? "STUDENT",
+                role = roleNames.Contains("ADMIN") ? "ADMIN"
+                    : roleNames.Contains("LECTURER") ? "LECTURER"
+                    : "STUDENT",
             }
         };
     }
