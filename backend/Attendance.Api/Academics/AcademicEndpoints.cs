@@ -200,7 +200,7 @@ public static class AcademicEndpoints
                 select new { u.Id, u.UserName, u.FullName, u.Email, u.StudentCode,
                     u.IsActive, u.EmailConfirmed }).ToListAsync(ct);
             return Results.Ok(students);
-        }).RequireAuthorization("ADMIN");
+        }).RequireAuthorization("STAFF");
         // Exact username lookup for an assigned lecturer adding a student to a class.
         a.MapGet("/students/lookup", async (string username, AttendanceDbContext db, ClaimsPrincipal user,
             CancellationToken ct) =>

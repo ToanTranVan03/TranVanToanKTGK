@@ -722,7 +722,7 @@ class ClassDetailPage extends ConsumerStatefulWidget {
 class _ClassDetailPageState extends ConsumerState<ClassDetailPage> {
   bool loading = true;
   String? error;
-  List<Map<String, dynamic>> roster = [], assigned = [], lecturers = [];
+  List<Map<String, dynamic>> roster = [], assigned = [], lecturers = [], allStudents = [];
   AcademicApi get api => AcademicApi(ref.read(apiClientProvider));
   @override
   void initState() {
@@ -741,14 +741,18 @@ class _ClassDetailPageState extends ConsumerState<ClassDetailPage> {
       final students = _student
           ? <Map<String, dynamic>>[]
           : await api.list('classes/${widget.classId}/students');
-      final available = _admin
+      final availableLecturers = _admin
           ? await api.list('lecturers')
+          : <Map<String, dynamic>>[];
+      final systemStudents = !_student
+          ? await api.list('students')
           : <Map<String, dynamic>>[];
       if (mounted) {
         setState(() {
           assigned = teachers;
           roster = students;
-          lecturers = available;
+          lecturers = availableLecturers;
+          allStudents = systemStudents;
         });
       }
     } catch (e) {
@@ -759,50 +763,125 @@ class _ClassDetailPageState extends ConsumerState<ClassDetailPage> {
   }
 
   Future<void> addStudent() async {
-    final username = TextEditingController();
-    final result = await showDialog<String>(
+    final candidates = allStudents
+        .where((x) => !roster.any((y) => _value(y['id']) == _value(x['id'])))
+        .toList();
+
+    if (candidates.isEmpty) {
+      _toast(
+        context,
+        'Tất cả sinh viên trong hệ thống đã thuộc lớp này (hoặc chưa có sinh viên nào).',
+      );
+      return;
+    }
+
+    String? selectedStudentId = _value(candidates.first['id']);
+    final searchCtrl = TextEditingController();
+
+    final chosenId = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Thêm sinh viên vào lớp'),
-        content: SizedBox(
-          width: 360,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Nhập chính xác tên đăng nhập của sinh viên đã đăng ký và xác nhận email.',
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialog) {
+          final query = searchCtrl.text.trim().toLowerCase();
+          final filtered = candidates.where((s) {
+            if (query.isEmpty) return true;
+            final name = _value(s['fullName']).toLowerCase();
+            final uname = _value(s['userName']).toLowerCase();
+            final code = _value(s['studentCode']).toLowerCase();
+            final email = _value(s['email']).toLowerCase();
+            return name.contains(query) ||
+                uname.contains(query) ||
+                code.contains(query) ||
+                email.contains(query);
+          }).toList();
+
+          return AlertDialog(
+            title: const Text('Thêm sinh viên vào lớp'),
+            content: SizedBox(
+              width: 400,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Chọn sinh viên từ danh sách hệ thống:'),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: searchCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Tìm kiếm tên, MSSV, username...',
+                      prefixIcon: Icon(Icons.search),
+                      isDense: true,
+                    ),
+                    onChanged: (_) => setDialog(() {}),
+                  ),
+                  const SizedBox(height: 12),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 280),
+                    child: filtered.isEmpty
+                        ? const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Text('Không tìm thấy sinh viên phù hợp.'),
+                          )
+                        : ListView.separated(
+                            shrinkWrap: true,
+                            itemCount: filtered.length,
+                            separatorBuilder: (_, _) => const Divider(height: 1),
+                            itemBuilder: (_, index) {
+                              final item = filtered[index];
+                              final sId = _value(item['id']);
+                              final isSelected = sId == selectedStudentId;
+                              final name = _value(item['fullName']);
+                              final uname = _value(item['userName']);
+                              final code = _value(item['studentCode']);
+                              return ListTile(
+                                dense: true,
+                                selected: isSelected,
+                                leading: CircleAvatar(
+                                  radius: 16,
+                                  child: Text(name.isNotEmpty ? name[0].toUpperCase() : 'S'),
+                                ),
+                                title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                subtitle: Text('@$uname${code.isNotEmpty ? ' · MSSV: $code' : ''}'),
+                                trailing: isSelected
+                                    ? const Icon(Icons.check_circle, color: Colors.blue)
+                                    : null,
+                                onTap: () {
+                                  setDialog(() {
+                                    selectedStudentId = sId;
+                                  });
+                                },
+                              );
+                            },
+                          ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              _TextField(username, 'Tên đăng nhập (Username)'),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Hủy'),
+              ),
+              FilledButton(
+                onPressed: selectedStudentId == null
+                    ? null
+                    : () => Navigator.pop(ctx, selectedStudentId),
+                child: const Text('Thêm vào lớp'),
+              ),
             ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Hủy'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, username.text.trim()),
-            child: const Text('Thêm'),
-          ),
-        ],
+          );
+        },
       ),
     );
-    if (result == null || result.isEmpty || !mounted) return;
+
+    searchCtrl.dispose();
+    if (chosenId == null || chosenId.isEmpty || !mounted) return;
+
     try {
-      final found = await ref
-          .read(apiClientProvider)
-          .get<Map<String, dynamic>>(
-            'academics/students/lookup',
-            queryParameters: {'username': result},
-          );
-      final studentId = _value(found.data?['id']);
       await api.create('classes/${widget.classId}/students', {
-        'studentId': studentId,
+        'studentId': chosenId,
       });
       await reload();
-      if (mounted) _toast(context, 'Đã thêm sinh viên');
+      if (mounted) _toast(context, 'Đã thêm sinh viên vào lớp');
     } catch (e) {
       if (mounted) _toast(context, errorText(e));
     }
