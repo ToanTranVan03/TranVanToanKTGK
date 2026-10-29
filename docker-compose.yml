@@ -1,0 +1,35 @@
+# Local backend development only. Flutter MUST point to the deployed HTTPS API.
+services:
+  database:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: attendance
+      POSTGRES_USER: attendance
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Create .env from .env.example}
+    volumes:
+      - attendance_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U attendance -d attendance"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build:
+      context: ./backend/Attendance.Api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+      ConnectionStrings__Default: Host=database;Port=5432;Database=attendance;Username=attendance;Password=${POSTGRES_PASSWORD}
+      Database__ApplyMigrationsOnStartup: 'true'
+    ports:
+      - '8080:8080'
+    depends_on:
+      database:
+        condition: service_healthy
+
+volumes:
+  attendance_pgdata:
