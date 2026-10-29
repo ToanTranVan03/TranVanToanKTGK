@@ -35,6 +35,19 @@ class AuthApi {
         data: {'ticket': ticket, 'code': code});
     return response.data!;
   }
+
+  Future<Map<String, dynamic>> googleLogin({
+    required String idToken,
+    String? email,
+    String? fullName,
+  }) async {
+    final response = await dio.post<Map<String, dynamic>>('auth/google', data: {
+      'idToken': idToken,
+      'email': email,
+      'fullName': fullName,
+    });
+    return response.data!;
+  }
 }
 
 String errorText(Object error) {
@@ -43,6 +56,7 @@ String errorText(Object error) {
     if (data is Map && data['message'] is String) return data['message'] as String;
     if (data is Map && data['detail'] is String) return data['detail'] as String;
     if (error.response?.statusCode == 401) return 'Sai thông tin đăng nhập hoặc tài khoản bị khóa.';
+    if (error.response?.statusCode == 404) return 'Server online chưa cập nhật code mới (Lỗi 404). Cần push code Backend mới lên Render.';
     if (error.response?.statusCode == 429) return 'Bạn thao tác quá nhanh. Vui lòng thử lại sau.';
     if (error.response?.statusCode == 503) return 'Dịch vụ chưa sẵn sàng hoặc Email OTP chưa cấu hình.';
     if (error.response?.statusCode != null) return 'Máy chủ trả về lỗi ${error.response!.statusCode}.';

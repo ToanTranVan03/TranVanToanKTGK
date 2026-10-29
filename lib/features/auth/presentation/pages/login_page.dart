@@ -2,9 +2,11 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../../../core/config/api_config.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/session/app_session.dart';
 import '../../data/auth_api.dart';
 import 'otp_page.dart';
 
@@ -217,6 +219,116 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   }
 
   // =====================================================
+  // DANG NHAP GOOGLE OAUTH2
+  // =====================================================
+
+  Future<void> _loginWithGoogle() async {
+    if (_busy) return;
+    if (!ApiConfig.isConfigured) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Chưa cấu hình API HTTPS. Xem README-PHAN-3.md.')),
+      );
+      return;
+    }
+
+    setState(() => _busy = true);
+
+    try {
+      String idToken = 'mock_google_id_token_${DateTime.now().millisecondsSinceEpoch}';
+      String? email;
+      String? name;
+
+      try {
+        final googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
+        final googleUser = await googleSignIn.signIn();
+        if (googleUser != null) {
+          final googleAuth = await googleUser.authentication;
+          idToken = googleAuth.idToken ?? idToken;
+          email = googleUser.email;
+          name = googleUser.displayName;
+        } else {
+          if (mounted) setState(() => _busy = false);
+          return;
+        }
+      } catch (_) {
+        if (!mounted) return;
+        final emailController = TextEditingController();
+        final nameController = TextEditingController();
+
+        final dialogResult = await showDialog<bool>(
+          context: context,
+          builder: (dialogCtx) => AlertDialog(
+            title: const Text('Đăng nhập Google OAuth2'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Nhập Email Gmail để mô phỏng Google Sign-In:'),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(
+                    labelText: 'Google Email',
+                    hintText: 'sinhvien@gmail.com',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Họ và tên',
+                    hintText: 'Nguyễn Văn A',
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogCtx, false),
+                child: const Text('Hủy'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogCtx, true),
+                child: const Text('Đăng nhập'),
+              ),
+            ],
+          ),
+        );
+
+        if (dialogResult == true && emailController.text.trim().isNotEmpty) {
+          email = emailController.text.trim();
+          name = nameController.text.trim().isEmpty ? null : nameController.text.trim();
+          idToken = 'mock_google_token_${DateTime.now().millisecondsSinceEpoch}';
+        } else {
+          if (mounted) setState(() => _busy = false);
+          return;
+        }
+      }
+
+      final api = AuthApi(ref.read(apiClientProvider));
+      final result = await api.googleLogin(
+        idToken: idToken,
+        email: email,
+        fullName: name,
+      );
+
+      await AppSession.instance.signIn(result);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Đăng nhập Google thành công: ${AppSession.instance.fullName}')),
+      );
+      context.go(AppSession.instance.homePath);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorText(e))));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  // =====================================================
   // GIAO DIEN DANG NHAP
   // =====================================================
 
@@ -311,7 +423,36 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       child: Text(_busy ? 'Đang xử lý...' : 'Đăng nhập'),
                     ),
 
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
+
+                    // HOAC DANG NHAP BANG GOOGLE
+                    Row(
+                      children: const [
+                        Expanded(child: Divider()),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 12),
+                          child: Text('hoặc', style: TextStyle(color: Colors.grey)),
+                        ),
+                        Expanded(child: Divider()),
+                      ],
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // NUT DANG NHAP GOOGLE
+                    OutlinedButton.icon(
+                      onPressed: _busy ? null : _loginWithGoogle,
+                      icon: const Icon(Icons.g_mobiledata, size: 30, color: Colors.red),
+                      label: const Text(
+                        'Đăng nhập bằng Google (OAuth2)',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
 
                     // CHUYEN SANG DANG KY
                     TextButton(

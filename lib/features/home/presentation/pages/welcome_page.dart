@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/app_theme.dart';
-import '../../../backend_status/presentation/widgets/backend_connection_card.dart';
 
 class WelcomePage extends StatelessWidget {
   const WelcomePage({super.key});
@@ -83,9 +82,7 @@ class WelcomePage extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                const BackendConnectionCard(),
-                const SizedBox(height: 22),
+                const SizedBox(height: 24),
                 FilledButton.icon(
                   onPressed: () => context.go('/login'),
                   icon: const Icon(Icons.arrow_forward_rounded),
