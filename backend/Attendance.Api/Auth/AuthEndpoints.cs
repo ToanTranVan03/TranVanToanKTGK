@@ -35,7 +35,6 @@ public static class AuthEndpoints
         ResendEmailService sender,
         CancellationToken ct)
     {
-        // 1. Kiem tra du lieu dau vao
         if (dto is null ||
             string.IsNullOrWhiteSpace(dto.Username) ||
             string.IsNullOrWhiteSpace(dto.Email) ||
