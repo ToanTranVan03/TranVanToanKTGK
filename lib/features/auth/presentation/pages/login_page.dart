@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,14 +10,17 @@ import 'otp_page.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
+
   @override
   ConsumerState<LoginPage> createState() => _LoginPageState();
 }
 
 class _LoginPageState extends ConsumerState<LoginPage> {
   final _formKey = GlobalKey<FormState>();
+
   final _username = TextEditingController();
   final _password = TextEditingController();
+
   bool _hidden = true;
   bool _busy = false;
 
@@ -27,72 +31,321 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     super.dispose();
   }
 
+  // =====================================================
+  // DANG NHAP BANG USERNAME VA PASSWORD
+  // =====================================================
+
   Future<void> _login() async {
-    if (!(_formKey.currentState?.validate() ?? false) || _busy) return;
-    if (!ApiConfig.isConfigured) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Chưa cấu hình API HTTPS. Xem README-PHAN-3.md.'),
-      ));
+    if (!(_formKey.currentState?.validate() ?? false) || _busy) {
       return;
     }
-    setState(() => _busy = true);
+
+    if (!ApiConfig.isConfigured) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Chưa cấu hình API HTTPS. Xem README-PHAN-3.md.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _busy = true;
+    });
+
     try {
       final api = AuthApi(ref.read(apiClientProvider));
-      final result = await api.passwordLogin(_username.text.trim(), _password.text);
-      if (!mounted) return;
-      context.push('/otp', extra: OtpArguments.login(
-        ticket: result['ticket'] as String,
-        emailHint: result['emailHint'] as String? ?? '',
-      ));
+
+      final result = await api.passwordLogin(
+        _username.text.trim(),
+        _password.text,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      // Dang nhap dung -> chuyen sang OTP dang nhap
+      context.push(
+        '/otp',
+        extra: OtpArguments.login(
+          ticket: result['ticket'] as String,
+          emailHint: result['emailHint'] as String? ?? '',
+        ),
+      );
+    } on DioException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      final data = error.response?.data;
+
+      // Tai khoan dung mat khau nhung chua xac minh email
+      if (data is Map &&
+          data['code'] == 'EMAIL_NOT_CONFIRMED' &&
+          data['email'] is String &&
+          (data['email'] as String).isNotEmpty) {
+        final address = data['email'] as String;
+
+        // Thu gui lai OTP xac nhan email
+        try {
+          await AuthApi(ref.read(apiClientProvider)).resendEmail(address);
+        } catch (resendError) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Chưa gửi được OTP: ${errorText(resendError)}'),
+              ),
+            );
+          }
+        }
+
+        if (!mounted) {
+          return;
+        }
+
+        // Van mo man hinh xac minh de nguoi dung
+        // co the bam Gui lai OTP thu cong
+        context.push('/otp', extra: OtpArguments.emailConfirmation(address));
+      } else {
+        // Cac loi khac: sai mat khau, tai khoan, API...
+        if (mounted) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(errorText(error))));
+        }
+      }
     } catch (error) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorText(error))));
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(errorText(error))));
+      }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+        });
+      }
     }
   }
 
+  // =====================================================
+  // XAC MINH EMAIL DOI VOI TAI KHOAN CHUA XAC NHAN
+  // =====================================================
+
+  Future<void> _recoverEmail() async {
+    if (_busy) {
+      return;
+    }
+
+    final field = TextEditingController();
+
+    try {
+      final address = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text('Xác minh tài khoản'),
+            content: TextField(
+              controller: field,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: 'Gmail đã dùng đăng ký',
+                hintText: 'example@gmail.com',
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                },
+                child: const Text('Hủy'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext, field.text.trim());
+                },
+                child: const Text('Tiếp tục'),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (!mounted || address == null) {
+        return;
+      }
+
+      if (!address.contains('@') || !address.contains('.')) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Gmail chưa hợp lệ.')));
+        return;
+      }
+
+      setState(() {
+        _busy = true;
+      });
+
+      // Gui lai OTP xac nhan email
+      try {
+        final api = AuthApi(ref.read(apiClientProvider));
+
+        await api.resendEmail(address);
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Chưa gửi được OTP: ${errorText(error)}')),
+          );
+        }
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      // Mo man hinh nhap OTP du gui email thanh cong
+      // hay can nguoi dung bam Gui lai OTP
+      context.push('/otp', extra: OtpArguments.emailConfirmation(address));
+    } finally {
+      field.dispose();
+
+      if (mounted && _busy) {
+        setState(() {
+          _busy = false;
+        });
+      }
+    }
+  }
+
+  // =====================================================
+  // GIAO DIEN DANG NHAP
+  // =====================================================
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Đăng nhập')),
-        body: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 440),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Form(
-                  key: _formKey,
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                    const Icon(Icons.verified_user_outlined, size: 74, color: Color(0xFF275DCE)),
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Đăng nhập')),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Icon(
+                      Icons.verified_user_outlined,
+                      size: 74,
+                      color: Color(0xFF275DCE),
+                    ),
+
                     const SizedBox(height: 16),
-                    const Text('Chào mừng trở lại!', textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 25, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 28),
-                    TextFormField(controller: _username, textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(labelText: 'Tên đăng nhập', prefixIcon: Icon(Icons.person_outline)),
-                      validator: (v) => v == null || v.trim().isEmpty ? 'Vui lòng nhập tên đăng nhập' : null),
-                    const SizedBox(height: 16),
-                    TextFormField(controller: _password, obscureText: _hidden,
-                      decoration: InputDecoration(labelText: 'Mật khẩu', prefixIcon: const Icon(Icons.lock_outline),
-                        suffixIcon: IconButton(onPressed: () => setState(() => _hidden = !_hidden),
-                          icon: Icon(_hidden ? Icons.visibility_off_outlined : Icons.visibility_outlined))),
-                      validator: (v) => v == null || v.isEmpty ? 'Vui lòng nhập mật khẩu' : null,
-                      onFieldSubmitted: (_) => _login()),
-                    const SizedBox(height: 24),
-                    FilledButton(onPressed: _busy ? null : _login,
-                      child: Text(_busy ? 'Đang gửi OTP...' : 'Đăng nhập')),
-                    const SizedBox(height: 8),
-                    TextButton(onPressed: () => context.push('/register'),
-                      child: const Text('Chưa có tài khoản? Đăng ký')),
-                    const SizedBox(height: 6),
-                    const Text('Sau khi nhập đúng mật khẩu, mã OTP sẽ được gửi qua email.',
+
+                    const Text(
+                      'Chào mừng trở lại!',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                  ]),
+                      style: TextStyle(
+                        fontSize: 25,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+
+                    const SizedBox(height: 28),
+
+                    // TEN DANG NHAP
+                    TextFormField(
+                      controller: _username,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(
+                        labelText: 'Tên đăng nhập',
+                        prefixIcon: Icon(Icons.person_outline),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Vui lòng nhập tên đăng nhập';
+                        }
+                        return null;
+                      },
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // MAT KHAU
+                    TextFormField(
+                      controller: _password,
+                      obscureText: _hidden,
+                      decoration: InputDecoration(
+                        labelText: 'Mật khẩu',
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          onPressed: () {
+                            setState(() {
+                              _hidden = !_hidden;
+                            });
+                          },
+                          icon: Icon(
+                            _hidden
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                          ),
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Vui lòng nhập mật khẩu';
+                        }
+                        return null;
+                      },
+                      onFieldSubmitted: (_) {
+                        _login();
+                      },
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // NUT DANG NHAP
+                    FilledButton(
+                      onPressed: _busy ? null : _login,
+                      child: Text(_busy ? 'Đang xử lý...' : 'Đăng nhập'),
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    // CHUYEN SANG DANG KY
+                    TextButton(
+                      onPressed: _busy
+                          ? null
+                          : () {
+                              context.push('/register');
+                            },
+                      child: const Text('Chưa có tài khoản? Đăng ký'),
+                    ),
+
+                    const SizedBox(height: 4),
+
+                    // GUI LAI OTP XAC MINH EMAIL
+                    TextButton(
+                      onPressed: _busy ? null : _recoverEmail,
+                      child: const Text('Chưa xác nhận Gmail? Gửi lại mã OTP'),
+                    ),
+
+                    const SizedBox(height: 6),
+
+                    const Text(
+                      'Sau khi nhập đúng mật khẩu, '
+                      'mã OTP sẽ được gửi qua email.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
         ),
-      );
+      ),
+    );
+  }
 }
