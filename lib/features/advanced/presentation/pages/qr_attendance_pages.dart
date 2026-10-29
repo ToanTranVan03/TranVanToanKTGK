@@ -8,6 +8,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../widgets/location_gate.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../auth/data/auth_api.dart';
 import '../../data/advanced_attendance_api.dart';
@@ -262,70 +263,76 @@ class _QrGpsScanPageState extends ConsumerState<QrGpsScanPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Quét QR + GPS')),
-    body: _result != null
-        ? Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.check_circle, size: 68, color: Colors.green),
-                  const SizedBox(height: 16),
-                  Text(_result!, textAlign: TextAlign.center),
-                  const SizedBox(height: 16),
-                  FilledButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Về danh sách phiên'),
-                  ),
-                ],
-              ),
-            ),
-          )
-        : Column(
-            children: [
-              Expanded(
-                child: Stack(
-                  children: [
-                    MobileScanner(
-                      controller: _camera,
-                      onDetect: (capture) {
-                        if (capture.barcodes.isEmpty) return;
-                        final raw = capture.barcodes.first.rawValue;
-                        if (raw != null) _submit(raw);
-                      },
-                    ),
-                    const Center(
-                      child: Icon(
-                        Icons.qr_code_scanner,
-                        size: 190,
-                        color: Colors.white60,
-                      ),
-                    ),
-                    if (_submitting)
-                      const Center(child: CircularProgressIndicator()),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16),
+  Widget build(BuildContext context) => LocationGate(
+    child: Scaffold(
+      appBar: AppBar(title: const Text('Quét QR + GPS')),
+      body: _result != null
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
-                      'Quét mã từ giảng viên; ứng dụng sẽ xin quyền GPS và gửi lên máy chủ.',
-                      textAlign: TextAlign.center,
+                    const Icon(
+                      Icons.check_circle,
+                      size: 68,
+                      color: Colors.green,
                     ),
-                    if (kDebugMode)
-                      TextButton.icon(
-                        onPressed: _submitting ? null : _manualToken,
-                        icon: const Icon(Icons.paste),
-                        label: const Text('Dán mã để kiểm thử máy ảo'),
-                      ),
+                    const SizedBox(height: 16),
+                    Text(_result!, textAlign: TextAlign.center),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Về danh sách phiên'),
+                    ),
                   ],
                 ),
               ),
-            ],
-          ),
+            )
+          : Column(
+              children: [
+                Expanded(
+                  child: Stack(
+                    children: [
+                      MobileScanner(
+                        controller: _camera,
+                        onDetect: (capture) {
+                          if (capture.barcodes.isEmpty) return;
+                          final raw = capture.barcodes.first.rawValue;
+                          if (raw != null) _submit(raw);
+                        },
+                      ),
+                      const Center(
+                        child: Icon(
+                          Icons.qr_code_scanner,
+                          size: 190,
+                          color: Colors.white60,
+                        ),
+                      ),
+                      if (_submitting)
+                        const Center(child: CircularProgressIndicator()),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'Quét mã từ giảng viên; ứng dụng sẽ xin quyền GPS và gửi lên máy chủ.',
+                        textAlign: TextAlign.center,
+                      ),
+                      if (kDebugMode)
+                        TextButton.icon(
+                          onPressed: _submitting ? null : _manualToken,
+                          icon: const Icon(Icons.paste),
+                          label: const Text('Dán mã để kiểm thử máy ảo'),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+    ),
   );
 }
