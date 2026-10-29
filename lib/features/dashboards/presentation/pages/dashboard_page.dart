@@ -14,9 +14,24 @@ class DashboardPage extends StatelessWidget {
       _ => 'Dashboard sinh viên',
     };
     final features = switch (role) {
-      'ADMIN' => ['Quản lý người dùng và phân quyền', 'Quản lý lớp học', 'Cấu hình hệ thống'],
-      'LECTURER' => ['Danh sách lớp giảng dạy', 'Tạo phiên điểm danh', 'Thống kê chuyên cần'],
-      _ => ['Điểm danh', 'Lịch sử vắng học', 'Đơn xin nghỉ học'],
+      'ADMIN' => <(String, String, IconData)>[
+        ('Phân quyền người dùng', '/admin/users', Icons.admin_panel_settings_outlined),
+        ('Quản lý môn học', '/courses', Icons.menu_book_outlined),
+        ('Quản lý phòng học', '/rooms', Icons.meeting_room_outlined),
+        ('Quản lý lớp học', '/classes', Icons.groups_outlined),
+        ('Quản lý sinh viên', '/students', Icons.person_outline),
+        ('Duyệt đơn xin nghỉ', '/leaves', Icons.fact_check_outlined),
+      ],
+      'LECTURER' => <(String, String, IconData)>[
+        ('Lớp giảng dạy và điểm danh', '/classes', Icons.groups_outlined),
+        ('Danh sách môn học', '/courses', Icons.menu_book_outlined),
+        ('Duyệt đơn xin nghỉ', '/leaves', Icons.fact_check_outlined),
+      ],
+      _ => <(String, String, IconData)>[
+        ('Lớp học và điểm danh', '/classes', Icons.how_to_reg_outlined),
+        ('Lịch sử điểm danh', '/classes', Icons.history_outlined),
+        ('Gửi và xem đơn xin nghỉ', '/leaves', Icons.edit_note_outlined),
+      ],
     };
     return Scaffold(
       appBar: AppBar(title: Text(heading), actions: [
@@ -25,23 +40,22 @@ class DashboardPage extends StatelessWidget {
           if (context.mounted) context.go('/login');
         }, icon: const Icon(Icons.logout))
       ]),
-      body: ListView(padding: const EdgeInsets.all(22), children: [
+      body: ListView(padding: const EdgeInsets.all(20), children: [
         Text('Xin chào, ${AppSession.instance.fullName ?? ''}',
-          style: const TextStyle(fontSize: 23, fontWeight: FontWeight.bold)),
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
         const SizedBox(height: 6),
-        const Text('Bạn đã đăng nhập và xác minh Email OTP thành công.'),
+        const Text('Đăng nhập Email OTP thành công · Quản lý điểm danh Phần 4'),
         const SizedBox(height: 20),
-        for (final feature in features) Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Card(child: ListTile(
-            leading: const Icon(Icons.check_circle_outline, color: Color(0xFF275DCE)),
-            title: Text(feature),
-            subtitle: const Text('Chức năng nghiệp vụ triển khai ở Phần 4'),
-          )),
-        ),
-        if (role == 'ADMIN') OutlinedButton.icon(
-          onPressed: () => context.push('/admin/users'),
-          icon: const Icon(Icons.manage_accounts), label: const Text('Quản lý phân quyền người dùng')),
+        for (final (title, path, icon) in features)
+          Padding(padding: const EdgeInsets.only(bottom: 8),
+            child: Card(child: ListTile(
+              leading: Icon(icon, color: const Color(0xFF275DCE)),
+              title: Text(title),
+              subtitle: const Text('Dữ liệu trực tiếp từ PostgreSQL · Render API'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push(path),
+            )),
+          ),
       ]),
     );
   }
