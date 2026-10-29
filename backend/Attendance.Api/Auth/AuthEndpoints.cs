@@ -28,146 +28,103 @@ public static class AuthEndpoints
         return app;
     }
 
-
-    private static async Task<IResult> Register(
-        RegisterDto? dto,
-        UserManager<ApplicationUser> users,
-        ResendEmailService sender,
-        CancellationToken ct)
+    // Tài khoản được tạo trước khi gửi thư. Trả emailSent=false khi nhà cung cấp
+    // từ chối để Flutter vẫn mở màn hình xác minh, không tạo tài khoản trùng.
+    private static async Task<IResult> Register(RegisterDto? dto,
+        UserManager<ApplicationUser> users, ResendEmailService sender, CancellationToken ct)
     {
-        if (dto is null ||
-            string.IsNullOrWhiteSpace(dto.Username) ||
-            string.IsNullOrWhiteSpace(dto.Email) ||
-            string.IsNullOrWhiteSpace(dto.FullName) ||
+        if (dto is null || string.IsNullOrWhiteSpace(dto.Username) ||
+            string.IsNullOrWhiteSpace(dto.Email) || string.IsNullOrWhiteSpace(dto.FullName) ||
             string.IsNullOrWhiteSpace(dto.Password))
-        {
-            return Results.BadRequest(new
-            {
-                message = "Vui lòng nhập đầy đủ thông tin đăng ký."
-            });
-        }
+            return Results.BadRequest(new { message = "Vui lòng nhập đầy đủ thông tin đăng ký." });
 
         var username = dto.Username.Trim();
         var email = dto.Email.Trim().ToLowerInvariant();
         var fullName = dto.FullName.Trim();
-
-        if (username.Length < 3 ||
-            username.Length > 60 ||
-            fullName.Length < 2 ||
+        if (username.Length < 3 || username.Length > 60 || fullName.Length < 2 ||
             dto.Password.Length < 10 ||
-            !new System.ComponentModel.DataAnnotations
-                .EmailAddressAttribute().IsValid(email))
-        {
-            return Results.BadRequest(new
-            {
-                message = "Thông tin đăng ký không hợp lệ."
-            });
-        }
+            !new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(email))
+            return Results.BadRequest(new { message = "Thông tin đăng ký không hợp lệ." });
 
-        // 2. Kiem tra dich vu gui email
         if (!sender.IsConfigured)
-        {
-            return Results.Json(new
-            {
-                message = "Dịch vụ Email OTP chưa được cấu hình."
-            }, statusCode: 503);
-        }
+            return Results.Json(new { message = "Dịch vụ Email OTP chưa được cấu hình." },
+                statusCode: StatusCodes.Status503ServiceUnavailable);
 
-        // 3. Tao tai khoan sinh vien
-        var user = new ApplicationUser
-        {
-            UserName = username,
-            Email = email,
-            FullName = fullName,
-            LockoutEnabled = true
+        var user = new ApplicationUser {
+            UserName = username, Email = email, FullName = fullName, LockoutEnabled = true
         };
-
-        var result = await users.CreateAsync(
-            user, dto.Password);
-
-        if (!result.Succeeded)
-        {
-            return Results.BadRequest(new
-            {
-                message = string.Join("; ",
-                    result.Errors.Select(e => e.Description))
+        var created = await users.CreateAsync(user, dto.Password);
+        if (!created.Succeeded)
+            return Results.BadRequest(new {
+                code = "ACCOUNT_EXISTS_OR_INVALID",
+                message = string.Join("; ", created.Errors.Select(e => e.Description))
             });
-        }
 
-        // 4. Gan vai tro sinh vien
-        var roleResult = await users.AddToRoleAsync(
-            user, "STUDENT");
+        // Không bao giờ nhận role từ dữ liệu đăng ký công khai.
+        var assigned = await users.AddToRoleAsync(user, "STUDENT");
+        if (!assigned.Succeeded)
+            return Results.Problem("Không thể gán vai trò sinh viên.");
 
-        if (!roleResult.Succeeded)
-        {
-            return Results.Problem(
-                "Không thể gán vai trò sinh viên.");
-        }
-
-        // 5. Tao OTP xac nhan email
-        var code = await users.GenerateUserTokenAsync(
-            user,
-            EmailProvider,
-            ConfirmPurpose);
-
-        // 6. Gui OTP qua Resend
-        var sent = await sender.SendOtpAsync(
+        var otp = await users.GenerateUserTokenAsync(user, EmailProvider, ConfirmPurpose);
+        var emailSent = await sender.SendOtpAsync(email, otp, "xác nhận email", ct);
+        return Results.Ok(new {
             email,
-            code,
-            "xác nhận email",
-            ct);
-
-        if (!sent)
-        {
-            return Results.Json(new
-            {
-                message = "Tài khoản đã được tạo nhưng chưa gửi " +
-                          "được OTP. Vui lòng sử dụng chức năng " +
-                          "Gửi lại OTP."
-            }, statusCode: 503);
-        }
-
-        return Results.Ok(new
-        {
-            message = "Đã đăng ký và gửi OTP thành công.",
-            email
+            verificationRequired = true,
+            emailSent,
+            message = emailSent
+                ? "Tài khoản đã tạo, vui lòng kiểm tra Gmail để lấy mã OTP."
+                : "Tài khoản đã tạo nhưng email OTP chưa gửi được. Hãy kiểm tra cấu hình dịch vụ email. Bạn có thể xác minh sau, không cần đăng ký lại."
         });
     }
 
-
-    private static async Task<IResult> VerifyEmail(EmailOtpDto dto,
+    private static async Task<IResult> VerifyEmail(EmailOtpDto? dto,
         UserManager<ApplicationUser> users)
     {
+        if (dto is null || string.IsNullOrWhiteSpace(dto.Email) ||
+            string.IsNullOrWhiteSpace(dto.Code))
+            return Results.BadRequest(new { message = "Vui lòng nhập email và mã OTP." });
         var user = await users.FindByEmailAsync(dto.Email.Trim());
-        if (user is null) return Results.BadRequest(new { message = "Mã OTP hoặc email không hợp lệ." });
-        if (user.EmailConfirmed) return Results.Ok(new { message = "Email đã xác nhận." });
-        var valid = await users.VerifyUserTokenAsync(user, EmailProvider, ConfirmPurpose, dto.Code.Trim());
-        if (!valid) return Results.BadRequest(new { message = "Mã OTP không hợp lệ hoặc hết hạn." });
+        if (user is null)
+            return Results.BadRequest(new { message = "Mã OTP hoặc email không hợp lệ." });
+        if (user.EmailConfirmed)
+            return Results.Ok(new { message = "Email đã được xác nhận. Bạn có thể đăng nhập." });
+        var valid = await users.VerifyUserTokenAsync(user, EmailProvider,
+            ConfirmPurpose, dto.Code.Trim());
+        if (!valid)
+            return Results.BadRequest(new { message = "Mã OTP không hợp lệ hoặc hết hạn." });
         user.EmailConfirmed = true;
-        var updated = await users.UpdateAsync(user);
-        return updated.Succeeded ? Results.Ok(new { message = "Đã xác nhận email. Bạn có thể đăng nhập." })
+        var saved = await users.UpdateAsync(user);
+        return saved.Succeeded
+            ? Results.Ok(new { message = "Đã xác nhận email. Bạn có thể đăng nhập." })
             : Results.Problem("Không thể xác nhận email.");
     }
 
-    private static async Task<IResult> ResendEmail(EmailDto dto,
+    private static async Task<IResult> ResendEmail(EmailDto? dto,
         UserManager<ApplicationUser> users, ResendEmailService sender, CancellationToken ct)
     {
+        if (dto is null || string.IsNullOrWhiteSpace(dto.Email))
+            return Results.BadRequest(new { message = "Vui lòng nhập email cần xác minh." });
+        if (!sender.IsConfigured)
+            return Results.Json(new { message = "Dịch vụ Email OTP chưa được cấu hình." },
+                statusCode: StatusCodes.Status503ServiceUnavailable);
+
         var user = await users.FindByEmailAsync(dto.Email.Trim());
-        if (user is not null && !user.EmailConfirmed && sender.IsConfigured)
+        if (user is not null && !user.EmailConfirmed)
         {
             var code = await users.GenerateUserTokenAsync(user, EmailProvider, ConfirmPurpose);
             await sender.SendOtpAsync(user.Email!, code, "xác nhận email", ct);
         }
-        // Do not reveal whether an email exists.
-        return Results.Ok(new { message = "Nếu tài khoản tồn tại và chưa xác nhận, email OTP sẽ được gửi." });
+        // Không tiết lộ email nào đang tồn tại để hạn chế dò tài khoản.
+        return Results.Ok(new { message = "Đã tiếp nhận yêu cầu. Nếu tài khoản chưa xác minh và dịch vụ email cho phép, OTP sẽ được gửi." });
     }
 
-    private static async Task<IResult> Login(LoginDto dto,
+    private static async Task<IResult> Login(LoginDto? dto,
         UserManager<ApplicationUser> users, IDataProtectionProvider protection,
         ResendEmailService sender, CancellationToken ct)
     {
-        if (!sender.IsConfigured)
-            return Results.Problem("Dịch vụ email chưa cấu hình.", statusCode: 503);
+        if (dto is null || string.IsNullOrWhiteSpace(dto.Username) ||
+            string.IsNullOrWhiteSpace(dto.Password))
+            return Results.BadRequest(new { message = "Nhập tên đăng nhập và mật khẩu." });
         var user = await users.FindByNameAsync(dto.Username.Trim());
         if (user is null || !user.IsActive || await users.IsLockedOutAsync(user))
             return Results.Unauthorized();
@@ -177,19 +134,32 @@ public static class AuthEndpoints
             return Results.Unauthorized();
         }
         if (!user.EmailConfirmed)
-            return Results.BadRequest(new { message = "Tài khoản chưa xác nhận email." });
+            // Trả email sau khi mật khẩu đã đúng để giao diện tự chuyển sang xác minh.
+            return Results.BadRequest(new {
+                code = "EMAIL_NOT_CONFIRMED",
+                message = "Tài khoản chưa xác minh email. Hãy nhập OTP xác nhận.",
+                email = user.Email
+            });
+        if (!sender.IsConfigured)
+            return Results.Json(new { message = "Dịch vụ email chưa cấu hình." },
+                statusCode: StatusCodes.Status503ServiceUnavailable);
+
         var code = await users.GenerateUserTokenAsync(user, EmailProvider, LoginPurpose);
         if (!await sender.SendOtpAsync(user.Email!, code, "đăng nhập", ct))
-            return Results.Problem("Không gửi được OTP. Kiểm tra nhà cung cấp email.", statusCode: 503);
+            return Results.Json(new { message = "Không gửi được OTP đăng nhập. Hãy kiểm tra dịch vụ Email OTP." },
+                statusCode: StatusCodes.Status503ServiceUnavailable);
         var ticket = protection.CreateProtector("Attendance.LoginTicket.v1")
             .ToTimeLimitedDataProtector().Protect(user.Id.ToString(), TimeSpan.FromMinutes(5));
         return Results.Ok(new { otpRequired = true, ticket, emailHint = MaskEmail(user.Email!) });
     }
 
-    private static async Task<IResult> VerifyLoginOtp(VerifyLoginDto dto,
+    private static async Task<IResult> VerifyLoginOtp(VerifyLoginDto? dto,
         UserManager<ApplicationUser> users, IDataProtectionProvider protection,
         JwtTokenService tokens)
     {
+        if (dto is null || string.IsNullOrWhiteSpace(dto.Ticket) ||
+            string.IsNullOrWhiteSpace(dto.Code))
+            return Results.BadRequest(new { message = "Thiếu phiên đăng nhập hoặc mã OTP." });
         string userId;
         try
         {
@@ -211,7 +181,6 @@ public static class AuthEndpoints
             return Results.BadRequest(new { message = "Mã OTP sai hoặc đã hết hạn." });
         }
         await users.ResetAccessFailedCountAsync(user);
-        // Invalidates the OTP code for reuse by rotating the user's security stamp.
         await users.UpdateSecurityStampAsync(user);
         return Results.Ok(await tokens.CreateAsync(user, users));
     }
@@ -238,9 +207,11 @@ public static class AuthEndpoints
         return Results.Ok(response);
     }
 
-    private static async Task<IResult> SetRole(Guid id, RoleDto dto,
+    private static async Task<IResult> SetRole(Guid id, RoleDto? dto,
         ClaimsPrincipal principal, UserManager<ApplicationUser> users)
     {
+        if (dto is null || string.IsNullOrWhiteSpace(dto.Role))
+            return Results.BadRequest(new { message = "Vui lòng chọn vai trò." });
         var role = dto.Role.Trim().ToUpperInvariant();
         if (!AuthSetup.Roles.Contains(role)) return Results.BadRequest(new { message = "Vai trò không hợp lệ." });
         if (principal.FindFirstValue(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub) == id.ToString())

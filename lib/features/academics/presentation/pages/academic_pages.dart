@@ -538,6 +538,8 @@ class _SessionsPageState extends ConsumerState<SessionsPage> {
             if (!_student) OverflowBar(children: [
               TextButton.icon(onPressed: () => edit(row), icon: const Icon(Icons.edit_outlined), label: const Text('Sửa')),
               TextButton.icon(onPressed: () => remove(row), icon: const Icon(Icons.delete_outline), label: const Text('Xóa')),
+              FilledButton.icon(onPressed: () => context.push('/sessions/${row['id']}/qr'),
+                icon: const Icon(Icons.qr_code), label: const Text('Hiện QR')),
             ]),
           ])),
         ])),
@@ -567,13 +569,6 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
     } catch (e) { if (mounted) setState(() => error = errorText(e)); }
     finally { if (mounted) setState(() => loading = false); }
   }
-  Future<void> checkIn() async {
-    try {
-      await api.create('sessions/${widget.sessionId}/check-in', {});
-      if (mounted) _toast(context, 'Đã ghi nhận điểm danh thử nghiệm.');
-      await reload();
-    } catch (e) { if (mounted) _toast(context, errorText(e)); }
-  }
   Future<void> mark(Map<String, dynamic> student) async {
     final current = records.where((x) => x['studentId'] == student['id']).toList();
     var status = current.isEmpty ? 'PRESENT' : _value(current.first['status']);
@@ -602,10 +597,10 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
       : error != null ? AcademicError(message: error!, retry: reload)
       : ListView(padding: const EdgeInsets.all(16), children: [
           if (_student) ...[
-            const Text('Điểm danh thủ công để kiểm thử CRUD. Ở Phần 5 sẽ thay bằng QR/GPS có xác thực.'),
+            const Text('Quét QR của giảng viên và chia sẻ GPS để điểm danh.'),
             const SizedBox(height: 12),
-            FilledButton.icon(onPressed: checkIn, icon: const Icon(Icons.check_circle_outline),
-              label: const Text('Điểm danh thử nghiệm')),
+            FilledButton.icon(onPressed: () => context.push('/qr/scan'),
+              icon: const Icon(Icons.qr_code_scanner), label: const Text('Quét QR + GPS')), 
             const SizedBox(height: 20),
             if (records.isEmpty) const ListTile(title: Text('Bạn chưa có kết quả điểm danh.')),
             for (final row in records) ListTile(title: Text(_value(row['status'])),

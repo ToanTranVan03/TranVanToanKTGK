@@ -38,6 +38,9 @@ dependencies:
   go_router: ^18.1.1
   dio: ^5.11.1
   flutter_secure_storage: ^11.2.0
+  mobile_scanner: ^7.4.2
+  geolocator: ^14.1.2
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:

@@ -3,6 +3,17 @@
 Day la **ban bo sung vao project dang chay**, KHONG PHAI project Flutter moi.
 Code giu nguyen Phan 3 (Email OTP/JWT/Resend) va ket noi thang Render PostgreSQL.
 
+$email = Read-Host "vvien01011978@gmail.com"
+$body = @{ email = $email } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri "https://tranvantoanktgk-api.onrender.com/api/v1/auth/resend-email" -ContentType "application/json" -Body $body
+
+
+$code = Read-Host "Nhap ma OTP"
+$body = @{ email = $email; code = $code } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri "https://tranvantoanktgk-api.onrender.com/api/v1/auth/verify-email" -ContentType "application/json" -Body $body
+
+
+
 ## 1. Copy dung thu muc
 
 ZIP co thu muc goc `TranVanToanKTGK/`.

@@ -4,7 +4,7 @@ using System.Net.Http.Json;
 namespace Attendance.Api.Auth;
 
 // Render Free blocks outbound SMTP ports. Use the Resend HTTPS API instead.
-public sealed class ResendEmailService(HttpClient http, IConfiguration config)
+public sealed class ResendEmailService(HttpClient http, IConfiguration config, ILogger<ResendEmailService> logger)
 {
     public bool IsConfigured => !string.IsNullOrWhiteSpace(config["Email:ResendApiKey"])
         && !string.IsNullOrWhiteSpace(config["Email:From"]);
@@ -24,9 +24,20 @@ public sealed class ResendEmailService(HttpClient http, IConfiguration config)
         try
         {
             using var response = await http.SendAsync(request, ct);
+            if (!response.IsSuccessStatusCode)
+                logger.LogWarning("Resend không chấp nhận yêu cầu gửi OTP, HTTP {StatusCode}. Kiểm tra domain/email nhận trên Resend.",
+                    (int)response.StatusCode);
             return response.IsSuccessStatusCode;
         }
-        catch (HttpRequestException) { return false; }
-        catch (TaskCanceledException) { return false; }
+        catch (HttpRequestException ex)
+        {
+            logger.LogWarning("Lỗi kết nối HTTPS tới Resend: {ErrorType}", ex.GetType().Name);
+            return false;
+        }
+        catch (TaskCanceledException)
+        {
+            logger.LogWarning("Gửi Resend hết thời gian chờ.");
+            return false;
+        }
     }
 }

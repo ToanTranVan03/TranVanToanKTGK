@@ -29,7 +29,8 @@ class DashboardPage extends StatelessWidget {
       ],
       _ => <(String, String, IconData)>[
         ('Lớp học và điểm danh', '/classes', Icons.how_to_reg_outlined),
-        ('Lịch sử điểm danh', '/classes', Icons.history_outlined),
+        ('Quét mã QR + vị trí GPS', '/qr/scan', Icons.qr_code_scanner),
+        ('Lịch sử điểm danh', '/attendance-history', Icons.history_outlined),
         ('Gửi và xem đơn xin nghỉ', '/leaves', Icons.edit_note_outlined),
       ],
     };
@@ -44,7 +45,7 @@ class DashboardPage extends StatelessWidget {
         Text('Xin chào, ${AppSession.instance.fullName ?? ''}',
           style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
         const SizedBox(height: 6),
-        const Text('Đăng nhập Email OTP thành công · Quản lý điểm danh Phần 4'),
+        const Text('Đăng nhập Email OTP thành công · Quản lý điểm danh Phần 5: QR + GPS'),
         const SizedBox(height: 20),
         for (final (title, path, icon) in features)
           Padding(padding: const EdgeInsets.only(bottom: 8),

@@ -7,6 +7,8 @@ import '../../features/admin/presentation/pages/user_roles_page.dart';
 import '../../features/dashboards/presentation/pages/dashboard_page.dart';
 import '../../features/home/presentation/pages/welcome_page.dart';
 import '../../features/academics/presentation/pages/academic_pages.dart';
+import '../../features/academics/presentation/pages/attendance_history_page.dart';
+import '../../features/advanced/presentation/pages/qr_attendance_pages.dart';
 
 GoRouter createAppRouter() => GoRouter(
   initialLocation: '/',
@@ -17,7 +19,8 @@ GoRouter createAppRouter() => GoRouter(
         path == '/lecturer' || path.startsWith('/admin/') ||
         path == '/courses' || path == '/rooms' || path == '/students' ||
         path == '/classes' || path.startsWith('/classes/') ||
-        path == '/leaves';
+        path == '/leaves' || path == '/attendance-history' ||
+        path == '/qr/scan' || path.startsWith('/sessions/');
     if (protectedRoute && !AppSession.instance.isAuthenticated) return '/login';
     if (protectedRoute && (path.startsWith('/admin') ||
         path == '/students') && AppSession.instance.role != 'ADMIN') {
@@ -27,6 +30,15 @@ GoRouter createAppRouter() => GoRouter(
       return AppSession.instance.homePath;
     }
     if (protectedRoute && path == '/student' && AppSession.instance.role != 'STUDENT') {
+      return AppSession.instance.homePath;
+    }
+    if (path == '/qr/scan' && AppSession.instance.role != 'STUDENT') {
+      return AppSession.instance.homePath;
+    }
+    if (path.startsWith('/sessions/') && AppSession.instance.role == 'STUDENT') {
+      return AppSession.instance.homePath;
+    }
+    if (path == '/attendance-history' && AppSession.instance.role != 'STUDENT') {
       return AppSession.instance.homePath;
     }
     return null;
@@ -47,6 +59,8 @@ GoRouter createAppRouter() => GoRouter(
     GoRoute(path: '/rooms', builder: (context, state) => const CatalogPage(type: 'rooms')),
     GoRoute(path: '/students', builder: (context, state) => const StudentsPage()),
     GoRoute(path: '/classes', builder: (context, state) => const ClassesPage()),
+    GoRoute(path: '/attendance-history',
+      builder: (context, state) => const AttendanceHistoryPage()),
     GoRoute(path: '/classes/:classId', builder: (context, state) =>
         ClassDetailPage(classId: state.pathParameters['classId']!)),
     GoRoute(path: '/classes/:classId/sessions', builder: (context, state) =>
@@ -54,6 +68,9 @@ GoRouter createAppRouter() => GoRouter(
     GoRoute(path: '/classes/:classId/sessions/:sessionId', builder: (context, state) =>
         AttendancePage(classId: state.pathParameters['classId']!,
           sessionId: state.pathParameters['sessionId']!)),
+    GoRoute(path: '/qr/scan', builder: (context, state) => const QrGpsScanPage()),
+    GoRoute(path: '/sessions/:sessionId/qr', builder: (context, state) =>
+        SessionQrPage(sessionId: state.pathParameters['sessionId']!)),
     GoRoute(path: '/leaves', builder: (context, state) => const LeavesPage()),
   ],
 );

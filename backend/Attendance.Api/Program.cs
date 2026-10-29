@@ -1,5 +1,6 @@
 using Attendance.Api.Auth;
 using Attendance.Api.Academics;
+using Attendance.Api.Advanced;
 using Attendance.Api.Data;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
@@ -86,6 +87,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapAttendanceAuth();
 app.MapAcademicEndpoints();
+app.MapAdvancedAttendanceEndpoints();
 app.MapHealthChecks("/health");
 
 app.MapGet("/api/v1/system/status", async (

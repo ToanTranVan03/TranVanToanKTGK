@@ -26,12 +26,25 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     if (!(_form.currentState?.validate() ?? false) || busy) return;
     setState(() => busy = true);
     try {
-      await AuthApi(ref.read(apiClientProvider)).register(
+      final result = await AuthApi(ref.read(apiClientProvider)).register(
         username: username.text.trim(), email: email.text.trim(), fullName: name.text.trim(), password: password.text);
-      if (mounted) context.push('/otp', extra: OtpArguments.emailConfirmation(email.text.trim()));
+      if (!mounted) return;
+      final sent = result['emailSent'] == true;
+      context.push('/otp', extra: OtpArguments.emailConfirmation(email.text.trim(), emailSent: sent));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorText(e))));
     } finally { if (mounted) setState(() => busy = false); }
+  }
+
+  void openEmailVerification() {
+    final address = email.text.trim();
+    if (!address.contains('@') || !address.contains('.')) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Nhập Gmail đã đăng ký ở ô Email trước khi xác minh.'),
+      ));
+      return;
+    }
+    context.push('/otp', extra: OtpArguments.emailConfirmation(address));
   }
 
   @override
@@ -59,6 +72,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             validator: (v) => (v?.length ?? 0) < 10 ? 'Mật khẩu tối thiểu 10 ký tự' : null),
           const SizedBox(height: 24),
           FilledButton(onPressed: busy ? null : submit, child: Text(busy ? 'Đang xử lý...' : 'Đăng ký và gửi OTP')),
+          const SizedBox(height: 8),
+          TextButton(onPressed: openEmailVerification,
+            child: const Text('Đã đăng ký nhưng chưa nhận OTP? Xác minh email')),
           TextButton(onPressed: () => context.go('/login'), child: const Text('Đã có tài khoản? Đăng nhập')),
         ]),
       )),

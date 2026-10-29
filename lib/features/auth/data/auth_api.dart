@@ -4,15 +4,16 @@ class AuthApi {
   AuthApi(this.dio);
   final Dio dio;
 
-  Future<void> register({
+  Future<Map<String, dynamic>> register({
     required String username,
     required String email,
     required String fullName,
     required String password,
   }) async {
-    await dio.post('auth/register', data: {
+    final response = await dio.post<Map<String, dynamic>>('auth/register', data: {
       'username': username, 'email': email, 'fullName': fullName, 'password': password,
     });
+    return response.data ?? <String, dynamic>{};
   }
 
   Future<void> verifyEmail(String email, String code) async {

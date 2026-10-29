@@ -8,15 +8,16 @@ import '../../data/auth_api.dart';
 enum OtpPurpose { confirmEmail, login }
 
 class OtpArguments {
-  const OtpArguments._(this.purpose, this.email, this.ticket, this.emailHint);
+  const OtpArguments._(this.purpose, this.email, this.ticket, this.emailHint, this.emailSent);
   final OtpPurpose purpose;
   final String? email;
   final String? ticket;
   final String emailHint;
-  factory OtpArguments.emailConfirmation(String email) =>
-      OtpArguments._(OtpPurpose.confirmEmail, email, null, email);
+  final bool? emailSent;
+  factory OtpArguments.emailConfirmation(String email, {bool? emailSent}) =>
+      OtpArguments._(OtpPurpose.confirmEmail, email, null, email, emailSent);
   factory OtpArguments.login({required String ticket, required String emailHint}) =>
-      OtpArguments._(OtpPurpose.login, null, ticket, emailHint);
+      OtpArguments._(OtpPurpose.login, null, ticket, emailHint, null);
 }
 
 class OtpPage extends ConsumerStatefulWidget {
@@ -29,6 +30,7 @@ class OtpPage extends ConsumerStatefulWidget {
 class _OtpPageState extends ConsumerState<OtpPage> {
   final _code = TextEditingController();
   bool _busy = false;
+  bool _resending = false;
   @override
   void dispose() { _code.dispose(); super.dispose(); }
 
@@ -57,12 +59,15 @@ class _OtpPageState extends ConsumerState<OtpPage> {
 
   Future<void> _resend() async {
     final email = widget.arguments.email;
-    if (email == null) return;
+    if (email == null || _resending) return;
+    setState(() => _resending = true);
     try {
       await AuthApi(ref.read(apiClientProvider)).resendEmail(email);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Nếu tài khoản hợp lệ, OTP đã được yêu cầu gửi lại.')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã yêu cầu gửi OTP. Kiểm tra Gmail và Spam. Nếu không nhận được, quản trị viên cần kiểm tra cấu hình Resend.')));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorText(e))));
+    } finally {
+      if (mounted) setState(() => _resending = false);
     }
   }
 
@@ -77,7 +82,15 @@ class _OtpPageState extends ConsumerState<OtpPage> {
         const Text('Nhập mã xác thực', textAlign: TextAlign.center,
             style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
-        Text('Mã 6 chữ số đã được gửi tới ${widget.arguments.emailHint}', textAlign: TextAlign.center),
+        Text(widget.arguments.purpose == OtpPurpose.confirmEmail
+            ? 'Nhập OTP xác minh Gmail: ${widget.arguments.emailHint}'
+            : 'Nhập OTP đăng nhập gửi tới ${widget.arguments.emailHint}',
+          textAlign: TextAlign.center),
+        if (widget.arguments.emailSent == false) ...[
+          const SizedBox(height: 12),
+          const Text('Tài khoản đã tạo nhưng chưa gửi được OTP. Không đăng ký lại. Hãy kiểm tra Resend hoặc nhấn Gửi lại OTP.',
+            textAlign: TextAlign.center, style: TextStyle(color: Colors.deepOrange)),
+        ],
         const SizedBox(height: 26),
         TextField(controller: _code, keyboardType: TextInputType.number,
           maxLength: 6, decoration: const InputDecoration(labelText: 'Mã OTP')),
@@ -85,7 +98,8 @@ class _OtpPageState extends ConsumerState<OtpPage> {
         FilledButton(onPressed: _busy ? null : _verify,
           child: Text(_busy ? 'Đang xác minh...' : 'Xác nhận OTP')),
         if (widget.arguments.purpose == OtpPurpose.confirmEmail)
-          TextButton(onPressed: _resend, child: const Text('Gửi lại OTP xác nhận')),
+          TextButton(onPressed: _resending ? null : _resend,
+            child: Text(_resending ? 'Đang gửi...' : 'Gửi lại OTP xác nhận')),
       ]),
     ))),
   );
