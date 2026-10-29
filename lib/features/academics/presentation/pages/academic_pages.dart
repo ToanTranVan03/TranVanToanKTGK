@@ -178,20 +178,6 @@ class _CatalogPageState extends ConsumerState<CatalogPage> {
           : _value(row?['radiusMeters']),
     );
 
-    if (row == null && !courses) {
-      lat.text = '10.762622'; // Default Vietnam HCMC
-      lon.text = '106.660172';
-      Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 5),
-        ),
-      ).then((pos) {
-        lat.text = pos.latitude.toStringAsFixed(6);
-        lon.text = pos.longitude.toStringAsFixed(6);
-      }).catchError((_) {});
-    }
-
     final payload = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -239,22 +225,30 @@ class _CatalogPageState extends ConsumerState<CatalogPage> {
                           return;
                         }
 
-                        Position? position;
-                        try {
-                          position = await Geolocator.getCurrentPosition(
-                            locationSettings: const LocationSettings(
-                              accuracy: LocationAccuracy.high,
-                              timeLimit: Duration(seconds: 8),
-                            ),
+                        final accuracyStatus =
+                            await Geolocator.getLocationAccuracy();
+
+                        if (accuracyStatus == LocationAccuracyStatus.reduced) {
+                          throw StateError(
+                            'Ứng dụng đang sử dụng vị trí gần đúng. '
+                            'Hãy bật Vị trí chính xác trong quyền ứng dụng.',
                           );
-                        } catch (_) {
-                          position = await Geolocator.getLastKnownPosition();
                         }
-                        position ??= await Geolocator.getCurrentPosition(
+
+                        final position = await Geolocator.getCurrentPosition(
                           locationSettings: const LocationSettings(
-                            accuracy: LocationAccuracy.medium,
+                            accuracy: LocationAccuracy.best,
+                            timeLimit: Duration(seconds: 25),
                           ),
                         );
+
+                        if (position.accuracy > 100) {
+                          throw StateError(
+                            'GPS chưa đủ chính xác. '
+                            'Sai số hiện tại: ${position.accuracy.toStringAsFixed(0)} mét. '
+                            'Hãy thử lại ở vị trí thông thoáng.',
+                          );
+                        }
 
                         if (!ctx.mounted) return;
 
@@ -807,7 +801,10 @@ class ClassDetailPage extends ConsumerStatefulWidget {
 class _ClassDetailPageState extends ConsumerState<ClassDetailPage> {
   bool loading = true;
   String? error;
-  List<Map<String, dynamic>> roster = [], assigned = [], lecturers = [], allStudents = [];
+  List<Map<String, dynamic>> roster = [],
+      assigned = [],
+      lecturers = [],
+      allStudents = [];
   AcademicApi get api => AcademicApi(ref.read(apiClientProvider));
   @override
   void initState() {
@@ -909,7 +906,8 @@ class _ClassDetailPageState extends ConsumerState<ClassDetailPage> {
                         : ListView.separated(
                             shrinkWrap: true,
                             itemCount: filtered.length,
-                            separatorBuilder: (_, _) => const Divider(height: 1),
+                            separatorBuilder: (_, _) =>
+                                const Divider(height: 1),
                             itemBuilder: (_, index) {
                               final item = filtered[index];
                               final sId = _value(item['id']);
@@ -922,12 +920,26 @@ class _ClassDetailPageState extends ConsumerState<ClassDetailPage> {
                                 selected: isSelected,
                                 leading: CircleAvatar(
                                   radius: 16,
-                                  child: Text(name.isNotEmpty ? name[0].toUpperCase() : 'S'),
+                                  child: Text(
+                                    name.isNotEmpty
+                                        ? name[0].toUpperCase()
+                                        : 'S',
+                                  ),
                                 ),
-                                title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                subtitle: Text('@$uname${code.isNotEmpty ? ' · MSSV: $code' : ''}'),
+                                title: Text(
+                                  name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  '@$uname${code.isNotEmpty ? ' · MSSV: $code' : ''}',
+                                ),
                                 trailing: isSelected
-                                    ? const Icon(Icons.check_circle, color: Colors.blue)
+                                    ? const Icon(
+                                        Icons.check_circle,
+                                        color: Colors.blue,
+                                      )
                                     : null,
                                 onTap: () {
                                   setDialog(() {
