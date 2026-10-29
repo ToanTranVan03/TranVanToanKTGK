@@ -107,6 +107,7 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapAttendanceAuth();
+app.MapFaceLoginEndpoints();
 app.MapAcademicEndpoints();
 app.MapAdvancedAttendanceEndpoints();
 app.MapHealthChecks("/health");

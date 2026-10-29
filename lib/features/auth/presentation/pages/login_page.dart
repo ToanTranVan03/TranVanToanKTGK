@@ -422,7 +422,15 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       onPressed: _busy ? null : _login,
                       child: Text(_busy ? 'Đang xử lý...' : 'Đăng nhập'),
                     ),
+                    const SizedBox(height: 12),
 
+                    OutlinedButton.icon(
+                      onPressed: _busy
+                          ? null
+                          : () => context.push('/face-login'),
+                      icon: const Icon(Icons.face),
+                      label: const Text('Đăng nhập bằng khuôn mặt'),
+                    ),
                     const SizedBox(height: 12),
 
                     // HOAC DANG NHAP BANG GOOGLE

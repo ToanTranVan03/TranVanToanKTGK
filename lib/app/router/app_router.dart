@@ -9,6 +9,7 @@ import '../../features/home/presentation/pages/welcome_page.dart';
 import '../../features/academics/presentation/pages/academic_pages.dart';
 import '../../features/academics/presentation/pages/attendance_history_page.dart';
 import '../../features/advanced/presentation/pages/qr_attendance_pages.dart';
+import '../../features/auth/presentation/pages/face_login_page.dart';
 
 GoRouter createAppRouter() => GoRouter(
   initialLocation: '/',
@@ -46,6 +47,10 @@ GoRouter createAppRouter() => GoRouter(
   routes: [
     GoRoute(path: '/', builder: (context, state) => const WelcomePage()),
     GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
+    GoRoute(
+      path: '/face-login',
+      builder: (context, state) => const FaceLoginPage(),
+    ),
     GoRoute(path: '/register', builder: (context, state) => const RegisterPage()),
     GoRoute(path: '/otp', builder: (context, state) {
       final args = state.extra;

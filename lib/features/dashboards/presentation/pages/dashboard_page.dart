@@ -47,6 +47,24 @@ class DashboardPage extends StatelessWidget {
         const SizedBox(height: 6),
         const Text('Đăng nhập Email OTP thành công · Quản lý điểm danh Phần 5: QR + GPS'),
         const SizedBox(height: 20),
+
+        Card(
+          child: ListTile(
+            leading: const Icon(
+              Icons.face_retouching_natural,
+              color: Color(0xFF275DCE),
+            ),
+            title: const Text('Kích hoạt Face Unlock'),
+            subtitle: const Text(
+              'Đăng nhập nhanh bằng khuôn mặt trên thiết bị hỗ trợ',
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/face-login'),
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
         for (final (title, path, icon) in features)
           Padding(padding: const EdgeInsets.only(bottom: 8),
             child: Card(child: ListTile(
