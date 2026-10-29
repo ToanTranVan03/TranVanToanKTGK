@@ -25,7 +25,20 @@ final apiClientProvider = Provider<Dio>((ref) {
     }
     handler.next(options);
   }));
+  dio.interceptors.add(
+    InterceptorsWrapper(
+      onRequest: (options, handler) {
+        final session = AppSession.instance;
 
+        if (session.isAuthenticated && session.token != null) {
+          options.headers['Authorization'] =
+          'Bearer ${session.token}';
+        }
+
+        handler.next(options);
+      },
+    ),
+  );
   ref.onDispose(() => dio.close(force: true));
   return dio;
 });
