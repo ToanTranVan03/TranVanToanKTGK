@@ -27,35 +27,34 @@ class _FaceLoginPageState extends ConsumerState<FaceLoginPage> {
   static const _secretKey = 'face_login_secret';
 
   Future<void> _verifyFace() async {
-    final biometrics = await _biometric.getAvailableBiometrics();
+    try {
+      final biometrics = await _biometric.getAvailableBiometrics();
 
-    final hasFace = biometrics.contains(BiometricType.face);
+      if (kDebugMode) {
+        debugPrint('BIOMETRIC TYPES: $biometrics');
+        debugPrint(
+          'CAN CHECK BIOMETRICS: '
+          '${await _biometric.canCheckBiometrics}',
+        );
+      }
 
-    // Chỉ cho phép test vân tay khi chạy Debug.
-    // Bản Release vẫn yêu cầu Face Unlock thực sự.
-    final allowDebugFingerprint =
-        kDebugMode && biometrics.contains(BiometricType.fingerprint);
-
-    if (!hasFace && !allowDebugFingerprint) {
-      throw StateError(
-        'Thiết bị chưa có Face Unlock khả dụng. '
-        'Nếu đang dùng Pixel 8 Emulator, hãy đăng ký '
-        'vân tay giả lập để kiểm thử trong chế độ Debug. '
-        'Hoặc sử dụng điện thoại hỗ trợ Face Unlock.',
+      // De Android tu chon phuong thuc sinh trac hoc
+      // ma he dieu hanh cho phep ung dung su dung.
+      final verified = await _biometric.authenticate(
+        localizedReason:
+            'Xac thuc sinh trac hoc de dang nhap Student Attendance',
+        biometricOnly: true,
+        sensitiveTransaction: true,
+        persistAcrossBackgrounding: true,
       );
-    }
 
-    final verified = await _biometric.authenticate(
-      localizedReason: hasFace
-          ? 'Xác minh khuôn mặt để sử dụng Student Attendance'
-          : 'Kiểm thử đăng nhập sinh trắc học bằng vân tay giả lập',
-      biometricOnly: true,
-      sensitiveTransaction: true,
-      persistAcrossBackgrounding: true,
-    );
-
-    if (!verified) {
-      throw StateError('Xác thực sinh trắc học không thành công.');
+      if (!verified) {
+        throw StateError('Xac thuc sinh trac hoc khong thanh cong.');
+      }
+    } on StateError {
+      rethrow;
+    } catch (error) {
+      throw StateError('Android khong the xac thuc sinh trac hoc: $error');
     }
   }
 

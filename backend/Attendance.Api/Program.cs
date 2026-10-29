@@ -7,6 +7,7 @@ using System.Threading.RateLimiting;
 using Attendance.Api.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Attendance.Api.Analytics;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -110,6 +111,7 @@ app.MapAttendanceAuth();
 app.MapFaceLoginEndpoints();
 app.MapAcademicEndpoints();
 app.MapAdvancedAttendanceEndpoints();
+app.MapAttendanceRiskEndpoints();
 app.MapHealthChecks("/health");
 
 app.MapGet("/api/v1/system/status", async (
