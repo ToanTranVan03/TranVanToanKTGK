@@ -219,8 +219,25 @@ class _QrGpsScanPageState extends ConsumerState<QrGpsScanPage> {
     } catch (error) {
       if (!mounted) return;
       final msg = error is StateError ? error.message : errorText(error);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(msg.toString())));
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.location_off, color: Colors.amber),
+              SizedBox(width: 8),
+              Text('Không thể điểm danh'),
+            ],
+          ),
+          content: Text(msg.toString()),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Đã hiểu'),
+            ),
+          ],
+        ),
+      );
     } finally {
       if (mounted) setState(() => _submitting = false);
     }

@@ -116,7 +116,13 @@ public static class AdvancedAttendanceEndpoints
 
             var distance = DistanceMeters(body.Latitude, body.Longitude, room.Latitude, room.Longitude);
             if (distance > room.RadiusMeters)
+            {
+                if (distance > 500000)
+                {
+                    return Bad($"Bạn đang cách phòng {Math.Round(distance)} m (vượt bán kính {room.RadiusMeters:0} m). ⚠️ LƯU Ý: Tọa độ phòng học {room.Name} hiện ở Mỹ/nước ngoài ({room.Latitude:F4}, {room.Longitude:F4}). Hãy vào Quản lý phòng học -> Sửa phòng -> Bấm 'Lấy vị trí hiện tại' để cập nhật tọa độ phòng về thực tế!");
+                }
                 return Bad($"Bạn đang cách phòng khoảng {Math.Round(distance)} m, vượt bán kính {room.RadiusMeters:0} m.");
+            }
 
             if (await db.AttendanceRecords.AnyAsync(x =>
                 x.AttendanceSessionId == sessionId && x.StudentId == studentId.Value, ct))

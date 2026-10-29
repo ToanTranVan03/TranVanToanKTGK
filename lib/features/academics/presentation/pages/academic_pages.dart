@@ -167,13 +167,13 @@ class _CatalogPageState extends ConsumerState<CatalogPage> {
                 if (courses) _TextField(credits, 'Số tín chỉ', number: true),
 
                 if (!courses) ...[
-                  _TextField(lat, 'Vĩ độ', number: true),
-                  _TextField(lon, 'Kinh độ', number: true),
-                  _TextField(radius, 'Bán kính (mét)', number: true),
-
-                  OutlinedButton.icon(
+                  _TextField(lat, 'Vĩ độ (Latitude)', number: true),
+                  _TextField(lon, 'Kinh độ (Longitude)', number: true),
+                  _TextField(radius, 'Bán kính điểm danh (mét)', number: true),
+                  const SizedBox(height: 8),
+                  FilledButton.icon(
                     icon: const Icon(Icons.my_location),
-                    label: const Text('Lấy vị trí hiện tại'),
+                    label: const Text('📍 Lấy vị trí GPS hiện tại'),
                     onPressed: () async {
                       try {
                         if (!await Geolocator.isLocationServiceEnabled()) {
@@ -210,8 +210,7 @@ class _CatalogPageState extends ConsumerState<CatalogPage> {
                         ScaffoldMessenger.of(ctx).showSnackBar(
                           SnackBar(
                             content: Text(
-                              'Đã lấy tọa độ. Sai số khoảng '
-                              '${position.accuracy.toStringAsFixed(0)} m.',
+                              'Đã lấy tọa độ GPS: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)} (Sai số ~${position.accuracy.toStringAsFixed(0)}m).',
                             ),
                           ),
                         );
