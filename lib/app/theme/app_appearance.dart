@@ -6,6 +6,7 @@ class AppAppearance {
 
   static const _storage = FlutterSecureStorage();
   static const _key = 'selected_background';
+  static const _textScaleKey = 'text_scale_factor';
 
   static const colors = <Color>[
     Color(0xFFF4F7FC), // Xanh trang nhat
@@ -23,7 +24,11 @@ class AppAppearance {
     'Trắng',
   ];
 
+  static const textScales = <double>[0.9, 1.0, 1.15, 1.3];
+  static const textScaleNames = <String>['Nhỏ', 'Mặc định', 'Lớn', 'Rất lớn'];
+
   static final selected = ValueNotifier<int>(0);
+  static final textScaleNotifier = ValueNotifier<double>(1.0);
 
   static Color get background => colors[selected.value];
 
@@ -35,8 +40,15 @@ class AppAppearance {
       if (index >= 0 && index < colors.length) {
         selected.value = index;
       }
+
+      final savedScale = await _storage.read(key: _textScaleKey);
+      final scale = double.tryParse(savedScale ?? '') ?? 1.0;
+      if (textScales.contains(scale)) {
+        textScaleNotifier.value = scale;
+      }
     } catch (_) {
       selected.value = 0;
+      textScaleNotifier.value = 1.0;
     }
   }
 
@@ -48,6 +60,17 @@ class AppAppearance {
     await _storage.write(
       key: _key,
       value: index.toString(),
+    );
+  }
+
+  static Future<void> changeTextScale(double scale) async {
+    if (!textScales.contains(scale)) return;
+
+    textScaleNotifier.value = scale;
+
+    await _storage.write(
+      key: _textScaleKey,
+      value: scale.toString(),
     );
   }
 }

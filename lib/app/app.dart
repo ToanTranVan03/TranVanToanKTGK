@@ -33,23 +33,32 @@ class _AttendanceAppState extends State<AttendanceApp> {
     return ValueListenableBuilder<int>(
       valueListenable: AppAppearance.selected,
       builder: (context, selectedColor, child) {
-        final background = AppAppearance.colors[selectedColor];
-        final baseTheme = AppTheme.light;
+        return ValueListenableBuilder<double>(
+          valueListenable: AppAppearance.textScaleNotifier,
+          builder: (context, textScale, _) {
+            final background = AppAppearance.colors[selectedColor];
+            final baseTheme = AppTheme.light;
 
-        return MaterialApp.router(
-          title: 'TranVanToanKTGK',
-          debugShowCheckedModeBanner: false,
-
-          // Mau nen theo lua chon cua nguoi dung.
-          theme: baseTheme.copyWith(
-            scaffoldBackgroundColor: background,
-            appBarTheme: baseTheme.appBarTheme.copyWith(
-              backgroundColor: background,
-            ),
-          ),
-
-          // Giu nguyen Router cua ung dung.
-          routerConfig: _router,
+            return MaterialApp.router(
+              title: 'TranVanToanKTGK',
+              debugShowCheckedModeBanner: false,
+              theme: baseTheme.copyWith(
+                scaffoldBackgroundColor: background,
+                appBarTheme: baseTheme.appBarTheme.copyWith(
+                  backgroundColor: background,
+                ),
+              ),
+              builder: (context, widget) {
+                return MediaQuery(
+                  data: MediaQuery.of(context).copyWith(
+                    textScaler: TextScaler.linear(textScale),
+                  ),
+                  child: widget ?? const SizedBox.shrink(),
+                );
+              },
+              routerConfig: _router,
+            );
+          },
         );
       },
     );

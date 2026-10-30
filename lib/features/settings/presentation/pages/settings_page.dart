@@ -179,6 +179,37 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                             );
                           },
                         ),
+                        const SizedBox(height: 24),
+                        const Text(
+                          'Kích thước chữ (Cỡ chữ)',
+                          style: TextStyle(fontSize: 15),
+                        ),
+                        const SizedBox(height: 12),
+                        ValueListenableBuilder<double>(
+                          valueListenable: AppAppearance.textScaleNotifier,
+                          builder: (context, currentScale, _) {
+                            return Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                for (int i = 0;
+                                    i < AppAppearance.textScales.length;
+                                    i++)
+                                  ChoiceChip(
+                                    label: Text(AppAppearance.textScaleNames[i]),
+                                    selected: currentScale == AppAppearance.textScales[i],
+                                    onSelected: (selected) async {
+                                      if (selected) {
+                                        await AppAppearance.changeTextScale(
+                                          AppAppearance.textScales[i],
+                                        );
+                                      }
+                                    },
+                                  ),
+                              ],
+                            );
+                          },
+                        ),
                       ],
                     ),
                   ),
