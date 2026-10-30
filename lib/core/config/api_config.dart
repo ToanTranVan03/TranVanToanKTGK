@@ -2,7 +2,7 @@
 abstract final class ApiConfig {
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: '',
+    defaultValue: 'https://tranvantoanktgk-api.onrender.com/api/v1',
   );
 
   static String get normalizedBaseUrl =>

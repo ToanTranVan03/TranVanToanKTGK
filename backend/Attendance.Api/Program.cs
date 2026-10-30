@@ -61,6 +61,15 @@ builder.Services.AddRateLimiter(options =>
 });
 
 builder.Services.AddHealthChecks();
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
 
 // Swagger - tài liệu API
 builder.Services.AddEndpointsApiExplorer();
@@ -103,6 +112,7 @@ if (app.Environment.IsDevelopment() ||
     });
 }
 
+app.UseCors();
 app.UseRouting();
 app.UseRateLimiter();
 app.UseAuthentication();
