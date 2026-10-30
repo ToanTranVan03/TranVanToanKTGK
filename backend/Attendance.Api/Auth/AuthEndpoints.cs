@@ -24,7 +24,7 @@ public static class AuthEndpoints
         auth.MapPost("/otp/verify", VerifyLoginOtp);
         auth.MapPost("/google", GoogleLogin);
         auth.MapGet("/me", Me).RequireAuthorization();
-
+        auth.MapPut("/me", UpdateMe).RequireAuthorization();
         var admin = app.MapGroup("/api/v1/admin").RequireAuthorization("ADMIN");
         admin.MapGet("/users", ListUsers);
         admin.MapPut("/users/{id:guid}/role", SetRole);
@@ -187,6 +187,56 @@ public static class AuthEndpoints
         await users.UpdateSecurityStampAsync(user);
         return Results.Ok(await tokens.CreateAsync(user, users));
     }
+
+public sealed record UpdateProfileDto(string? FullName);
+
+private static async Task<IResult> UpdateMe(
+    UpdateProfileDto? dto,
+    ClaimsPrincipal principal,
+    UserManager<ApplicationUser> users)
+{
+    var id = principal.FindFirstValue(
+        System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub
+    );
+
+    if (!Guid.TryParse(id, out var userId))
+        return Results.Unauthorized();
+
+    var user = await users.FindByIdAsync(userId.ToString());
+
+    if (user is null || !user.IsActive || !user.EmailConfirmed)
+        return Results.Unauthorized();
+
+    var fullName = dto?.FullName?.Trim();
+
+    if (string.IsNullOrWhiteSpace(fullName) ||
+        fullName.Length < 2 ||
+        fullName.Length > 200)
+    {
+        return Results.BadRequest(new
+        {
+            message = "Họ tên phải có từ 2 đến 200 ký tự."
+        });
+    }
+
+    user.FullName = fullName;
+
+    var result = await users.UpdateAsync(user);
+
+    if (!result.Succeeded)
+    {
+        return Results.BadRequest(new
+        {
+            message = "Không thể cập nhật hồ sơ."
+        });
+    }
+
+    return Results.Ok(new
+    {
+        message = "Cập nhật hồ sơ thành công.",
+        fullName = user.FullName
+    });
+}
 
     private static async Task<IResult> Me(ClaimsPrincipal principal, UserManager<ApplicationUser> users)
     {

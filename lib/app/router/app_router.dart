@@ -12,6 +12,7 @@ import '../../features/academics/presentation/pages/attendance_history_page.dart
 import '../../features/advanced/presentation/pages/qr_attendance_pages.dart';
 import '../../features/auth/presentation/pages/face_login_page.dart';
 import '../../features/analytics/presentation/pages/attendance_risk_page.dart';
+import '../../features/settings/presentation/pages/settings_page.dart';
 
 GoRouter createAppRouter() => GoRouter(
   initialLocation: '/',
@@ -34,6 +35,7 @@ GoRouter createAppRouter() => GoRouter(
         path == '/leaves' ||
         path == '/attendance-history' ||
         path == '/attendance-risk' || // PHAN 7
+        path == '/settings' ||
         path == '/qr/scan' ||
         path.startsWith('/sessions/');
 
@@ -210,5 +212,11 @@ GoRouter createAppRouter() => GoRouter(
 
     // Don xin nghi hoc
     GoRoute(path: '/leaves', builder: (context, state) => const LeavesPage()),
+
+    // Cai dat ca nhan
+    GoRoute(
+      path: '/settings',
+      builder: (context, state) => const SettingsPage(),
+    ),
   ],
 );

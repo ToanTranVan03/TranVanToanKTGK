@@ -65,4 +65,10 @@ class AppSession extends ChangeNotifier {
     await _storage.delete(key: 'expires_at');
     notifyListeners();
   }
+
+  Future<void> updateFullName(String newName) async {
+    fullName = newName.trim();
+    await _storage.write(key: 'user_name', value: fullName);
+    notifyListeners();
+  }
 }
